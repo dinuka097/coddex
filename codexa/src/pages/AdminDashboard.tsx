@@ -16,12 +16,13 @@ import {
   Clock,
   Star,
   ThumbsUp,
-  Award
+  Award,
+  Database,
+  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -46,49 +47,37 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-
-interface ContactSubmission {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone_number?: string;
-  service_interested: string;
-  project_budget?: string;
-  project_details: string;
-  created_at: string;
-  is_read: boolean;
-  notes?: string;
-}
-
-interface Testimonial {
-  id: string;
-  name: string;
-  email: string;
-  company?: string;
-  position?: string;
-  rating: number;
-  review: string;
-  created_at: string;
-  is_approved: boolean;
-  is_featured: boolean;
-}
+import {
+  ContactSubmission,
+  Testimonial,
+  Profile,
+  getContactSubmissions,
+  getTestimonials,
+  getProfiles,
+  markSubmissionAsRead,
+  updateSubmissionNotes,
+  deleteContactSubmission,
+  approveTestimonial,
+  toggleFeaturedTestimonial,
+  deleteTestimonial,
+  getAllDatabaseData
+} from "@/lib/firebaseService";
 
 const AdminDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<ContactSubmission | null>(null);
   const [selectedTestimonial, setSelectedTestimonial] = useState<Testimonial | null>(null);
   const [notes, setNotes] = useState('');
-  const [activeTab, setActiveTab] = useState<'submissions' | 'testimonials'>('submissions');
+  const [activeTab, setActiveTab] = useState<'submissions' | 'testimonials' | 'profiles' | 'overview'>('overview');
 
   useEffect(() => {
     checkAuth();
-    fetchSubmissions();
-    fetchTestimonials();
+    fetchAllData();
   }, []);
 
   const checkAuth = () => {
@@ -113,41 +102,20 @@ const AdminDashboard = () => {
     }
   };
 
-  const fetchSubmissions = async () => {
+  const fetchAllData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('contact_submissions')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setSubmissions(data || []);
+      const data = await getAllDatabaseData();
+      setSubmissions(data.contactSubmissions);
+      setTestimonials(data.testimonials);
+      setProfiles(data.profiles);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to fetch submissions",
+        description: "Failed to fetch data from Firebase",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchTestimonials = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('testimonials')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTestimonials(data || []);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch testimonials",
-        variant: "destructive",
-      });
     }
   };
 
@@ -159,13 +127,7 @@ const AdminDashboard = () => {
 
   const markAsRead = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('contact_submissions')
-        .update({ is_read: true })
-        .eq('id', id);
-
-      if (error) throw error;
-      
+      await markSubmissionAsRead(id);
       setSubmissions(prev => 
         prev.map(sub => sub.id === id ? { ...sub, is_read: true } : sub)
       );
@@ -180,13 +142,7 @@ const AdminDashboard = () => {
 
   const deleteSubmission = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('contact_submissions')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      
+      await deleteContactSubmission(id);
       setSubmissions(prev => prev.filter(sub => sub.id !== id));
       toast({
         title: "Success",
@@ -203,13 +159,7 @@ const AdminDashboard = () => {
 
   const saveNotes = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('contact_submissions')
-        .update({ notes })
-        .eq('id', id);
-
-      if (error) throw error;
-      
+      await updateSubmissionNotes(id, notes);
       setSubmissions(prev => 
         prev.map(sub => sub.id === id ? { ...sub, notes } : sub)
       );
@@ -227,15 +177,9 @@ const AdminDashboard = () => {
     }
   };
 
-  const approveTestimonial = async (id: string) => {
+  const approveTestimonialHandler = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('testimonials')
-        .update({ is_approved: true })
-        .eq('id', id);
-
-      if (error) throw error;
-      
+      await approveTestimonial(id);
       setTestimonials(prev => 
         prev.map(test => test.id === id ? { ...test, is_approved: true } : test)
       );
@@ -253,18 +197,12 @@ const AdminDashboard = () => {
     }
   };
 
-  const toggleFeaturedTestimonial = async (id: string) => {
+  const toggleFeaturedTestimonialHandler = async (id: string) => {
     try {
       const testimonial = testimonials.find(t => t.id === id);
       if (!testimonial) return;
 
-      const { error } = await supabase
-        .from('testimonials')
-        .update({ is_featured: !testimonial.is_featured })
-        .eq('id', id);
-
-      if (error) throw error;
-      
+      await toggleFeaturedTestimonial(id, testimonial.is_featured);
       setTestimonials(prev => 
         prev.map(test => test.id === id ? { ...test, is_featured: !test.is_featured } : test)
       );
@@ -282,15 +220,9 @@ const AdminDashboard = () => {
     }
   };
 
-  const deleteTestimonial = async (id: string) => {
+  const deleteTestimonialHandler = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('testimonials')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      
+      await deleteTestimonial(id);
       setTestimonials(prev => prev.filter(test => test.id !== id));
       toast({
         title: "Success",
@@ -308,13 +240,18 @@ const AdminDashboard = () => {
   const stats = {
     total: submissions.length,
     unread: submissions.filter(sub => !sub.is_read).length,
-    today: submissions.filter(sub => 
-      new Date(sub.created_at).toDateString() === new Date().toDateString()
-    ).length,
+    today: submissions.filter(sub => {
+      if (!sub.created_at?.toDate) return false;
+      return sub.created_at.toDate().toDateString() === new Date().toDateString();
+    }).length,
     testimonials: {
       total: testimonials.length,
       pending: testimonials.filter(test => !test.is_approved).length,
       featured: testimonials.filter(test => test.is_featured).length,
+    },
+    profiles: {
+      total: profiles.length,
+      admins: profiles.filter(profile => profile.role === 'admin').length,
     }
   };
 
@@ -329,6 +266,22 @@ const AdminDashboard = () => {
     );
   }
 
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'Unknown';
+    if (timestamp.toDate) {
+      return timestamp.toDate().toLocaleDateString();
+    }
+    return new Date(timestamp).toLocaleDateString();
+  };
+
+  const formatDateTime = (timestamp: any) => {
+    if (!timestamp) return 'Unknown';
+    if (timestamp.toDate) {
+      return timestamp.toDate().toLocaleString();
+    }
+    return new Date(timestamp).toLocaleString();
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -338,7 +291,7 @@ const AdminDashboard = () => {
             <div className="flex items-center space-x-3">
               <Shield className="text-secondary" size={24} />
               <h1 className="font-poppins font-bold text-xl text-foreground">
-                Coddex Admin
+                Coddex Admin - Firebase Backend
               </h1>
             </div>
             <Button 
@@ -359,7 +312,7 @@ const AdminDashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8"
         >
           <Card className="tech-hover bg-card/50 backdrop-blur-sm border-border">
             <CardContent className="p-6">
@@ -420,6 +373,18 @@ const AdminDashboard = () => {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="tech-hover bg-card/50 backdrop-blur-sm border-border">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Profiles</p>
+                  <p className="text-2xl font-bold text-foreground">{stats.profiles.total}</p>
+                </div>
+                <Users className="text-secondary" size={32} />
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* Main Content Tabs */}
@@ -430,13 +395,93 @@ const AdminDashboard = () => {
         >
           <Card className="tech-hover bg-card/50 backdrop-blur-sm border-border">
             <CardContent className="p-0">
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'submissions' | 'testimonials')}>
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
                 <div className="p-6 pb-0">
-                  <TabsList className="grid w-full grid-cols-2">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="overview">Database Overview</TabsTrigger>
                     <TabsTrigger value="submissions">Contact Submissions</TabsTrigger>
                     <TabsTrigger value="testimonials">Testimonials</TabsTrigger>
+                    <TabsTrigger value="profiles">User Profiles</TabsTrigger>
                   </TabsList>
                 </div>
+                
+                <TabsContent value="overview" className="p-6 pt-4">
+                  <div className="space-y-6">
+                    <div className="flex items-center space-x-2 mb-4">
+                      <Database className="text-secondary" size={24} />
+                      <h2 className="text-xl font-semibold">Firebase Database Overview</h2>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <Card className="border-border">
+                        <CardHeader>
+                          <CardTitle className="flex items-center space-x-2">
+                            <FileText size={20} />
+                            <span>Contact Submissions</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <p className="text-sm text-muted-foreground">Total: {stats.total}</p>
+                            <p className="text-sm text-muted-foreground">Unread: {stats.unread}</p>
+                            <p className="text-sm text-muted-foreground">Today: {stats.today}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-border">
+                        <CardHeader>
+                          <CardTitle className="flex items-center space-x-2">
+                            <Star size={20} />
+                            <span>Testimonials</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <p className="text-sm text-muted-foreground">Total: {stats.testimonials.total}</p>
+                            <p className="text-sm text-muted-foreground">Pending: {stats.testimonials.pending}</p>
+                            <p className="text-sm text-muted-foreground">Featured: {stats.testimonials.featured}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-border">
+                        <CardHeader>
+                          <CardTitle className="flex items-center space-x-2">
+                            <Users size={20} />
+                            <span>User Profiles</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <p className="text-sm text-muted-foreground">Total: {stats.profiles.total}</p>
+                            <p className="text-sm text-muted-foreground">Admins: {stats.profiles.admins}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
+                      <div className="space-y-2">
+                        {submissions.slice(0, 5).map((submission) => (
+                          <div key={submission.id} className="flex items-center justify-between p-3 bg-muted/10 rounded-md">
+                            <div>
+                              <p className="text-sm font-medium">{submission.first_name} {submission.last_name}</p>
+                              <p className="text-xs text-muted-foreground">{submission.email}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-muted-foreground">{formatDate(submission.created_at)}</p>
+                              <Badge variant={submission.is_read ? "secondary" : "default"} className="text-xs">
+                                {submission.is_read ? "Read" : "New"}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
                 
                 <TabsContent value="submissions" className="p-6 pt-4">
               <div className="overflow-x-auto">
@@ -468,7 +513,7 @@ const AdminDashboard = () => {
                         <TableCell>{submission.email}</TableCell>
                         <TableCell>{submission.service_interested}</TableCell>
                         <TableCell>
-                          {new Date(submission.created_at).toLocaleDateString()}
+                          {formatDate(submission.created_at)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
@@ -522,7 +567,7 @@ const AdminDashboard = () => {
                                       <div>
                                         <label className="text-sm font-medium text-muted-foreground">Date</label>
                                         <p className="text-foreground">
-                                          {new Date(selectedSubmission.created_at).toLocaleString()}
+                                          {formatDateTime(selectedSubmission.created_at)}
                                         </p>
                                       </div>
                                     </div>
@@ -621,7 +666,7 @@ const AdminDashboard = () => {
                               </div>
                             </TableCell>
                             <TableCell>
-                              {new Date(testimonial.created_at).toLocaleDateString()}
+                              {formatDate(testimonial.created_at)}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
@@ -672,7 +717,7 @@ const AdminDashboard = () => {
                                           <div>
                                             <label className="text-sm font-medium text-muted-foreground">Date</label>
                                             <p className="text-foreground">
-                                              {new Date(selectedTestimonial.created_at).toLocaleString()}
+                                              {formatDateTime(selectedTestimonial.created_at)}
                                             </p>
                                           </div>
                                         </div>
@@ -691,7 +736,7 @@ const AdminDashboard = () => {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => approveTestimonial(testimonial.id)}
+                                    onClick={() => approveTestimonialHandler(testimonial.id)}
                                     className="text-green-600 hover:text-green-700"
                                   >
                                     <ThumbsUp size={14} />
@@ -701,7 +746,7 @@ const AdminDashboard = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => toggleFeaturedTestimonial(testimonial.id)}
+                                  onClick={() => toggleFeaturedTestimonialHandler(testimonial.id)}
                                   className={testimonial.is_featured ? "text-amber-600 hover:text-amber-700" : ""}
                                 >
                                   <Award size={14} />
@@ -712,7 +757,7 @@ const AdminDashboard = () => {
                                   size="sm"
                                   onClick={() => {
                                     if (confirm('Are you sure you want to delete this testimonial?')) {
-                                      deleteTestimonial(testimonial.id);
+                                      deleteTestimonialHandler(testimonial.id);
                                     }
                                   }}
                                   className="text-destructive hover:text-destructive"
@@ -721,6 +766,37 @@ const AdminDashboard = () => {
                                 </Button>
                               </div>
                             </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="profiles" className="p-6 pt-4">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead>Updated</TableHead>
+                          <TableHead>User ID</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {profiles.map((profile) => (
+                          <TableRow key={profile.id}>
+                            <TableCell className="font-medium">{profile.email}</TableCell>
+                            <TableCell>
+                              <Badge variant={profile.role === 'admin' ? "default" : "secondary"}>
+                                {profile.role || 'user'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{formatDate(profile.created_at)}</TableCell>
+                            <TableCell>{formatDate(profile.updated_at)}</TableCell>
+                            <TableCell className="font-mono text-sm">{profile.user_id}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
