@@ -13,25 +13,35 @@ const AdminLogin = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: ''
   });
 
+  // Hardcoded admin credentials
+  const ADMIN_CREDENTIALS = {
+    username: 'admin',
+    password: 'coddex2024'
+  };
+
   useEffect(() => {
-    // Check if user is already authenticated and is admin
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .single();
+    // Check if admin is already authenticated
+    const checkAuth = () => {
+      const isAuthenticated = localStorage.getItem('adminAuthenticated');
+      const loginTime = localStorage.getItem('adminLoginTime');
+      
+      if (isAuthenticated === 'true' && loginTime) {
+        // Check if session is still valid (24 hours)
+        const now = Date.now();
+        const loginTimestamp = parseInt(loginTime);
+        const sessionDuration = 24 * 60 * 60 * 1000; // 24 hours
         
-        if (profile?.role === 'admin') {
+        if (now - loginTimestamp < sessionDuration) {
           navigate('/admin/dashboard');
+        } else {
+          // Session expired
+          localStorage.removeItem('adminAuthenticated');
+          localStorage.removeItem('adminLoginTime');
         }
       }
     };
@@ -44,54 +54,26 @@ const AdminLogin = () => {
     setIsLoading(true);
     
     try {
-      if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/admin/login`
-          }
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: "Account created!",
-          description: "Admin account has been created successfully.",
-        });
+      // Check hardcoded credentials
+      if (formData.username === ADMIN_CREDENTIALS.username && 
+          formData.password === ADMIN_CREDENTIALS.password) {
         
-        setIsSignUp(false);
-        setFormData({ email: '', password: '' });
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (error) throw error;
-
-        // Check if user is admin
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('user_id', data.user.id)
-          .single();
-
-        if (profile?.role !== 'admin') {
-          await supabase.auth.signOut();
-          throw new Error('Access denied. Admin privileges required.');
-        }
-
+        // Store admin session in localStorage
+        localStorage.setItem('adminAuthenticated', 'true');
+        localStorage.setItem('adminLoginTime', Date.now().toString());
+        
         toast({
           title: "Welcome back!",
           description: "Successfully logged in to admin dashboard.",
         });
         
         navigate('/admin/dashboard');
+      } else {
+        throw new Error('Invalid username or password');
       }
     } catch (error: any) {
       toast({
-        title: isSignUp ? "Signup Failed" : "Login Failed",
+        title: "Login Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -114,26 +96,26 @@ const AdminLogin = () => {
               <Shield className="text-secondary" size={32} />
             </div>
             <CardTitle className="font-poppins text-2xl text-foreground">
-              {isSignUp ? "Create Admin Account" : "Admin Access"}
+              Admin Access
             </CardTitle>
             <p className="text-muted-foreground">
-              {isSignUp ? "Set up your admin credentials" : "Enter your credentials to access the dashboard"}
+              Enter your credentials to access the dashboard
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
-                  Email Address
+                  Username
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-3 text-muted-foreground" size={18} />
                   <Input 
-                    type="email" 
-                    placeholder="admin@coddex.com"
+                    type="text" 
+                    placeholder="admin"
                     className="pl-10 bg-background/50 border-border focus:border-secondary"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    value={formData.username}
+                    onChange={(e) => setFormData({...formData, username: e.target.value})}
                     required
                   />
                 </div>
@@ -169,26 +151,16 @@ const AdminLogin = () => {
                 size="lg"
                 disabled={isLoading}
               >
-                {isLoading ? 
-                  (isSignUp ? "Creating Account..." : "Signing In...") : 
-                  (isSignUp ? "Create Account" : "Sign In")
-                }
+                {isLoading ? "Signing In..." : "Sign In"}
               </Button>
             </form>
 
             <div className="text-center space-y-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setFormData({ email: '', password: '' });
-                }}
-                className="text-sm text-secondary hover:text-secondary/80 transition-colors"
-              >
-                {isSignUp ? "Already have an account? Sign In" : "Need to create admin account? Sign Up"}
-              </button>
               <p className="text-sm text-muted-foreground">
                 Authorized personnel only
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Username: admin | Password: coddex2024
               </p>
             </div>
           </CardContent>

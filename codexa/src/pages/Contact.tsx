@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Layout from "@/components/Layout";
+import TestimonialForm from "@/components/TestimonialForm";
 import { motion } from "framer-motion";
 import { Mail, Phone, MapPin, Clock, Send, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -415,6 +416,9 @@ const Contact = () => {
           </div>
         </div>
       </section>
+
+      {/* Testimonial Form Section */}
+      <TestimonialForm />
     </Layout>
   );
 };

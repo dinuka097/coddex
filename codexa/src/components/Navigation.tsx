@@ -75,6 +75,12 @@ const Navigation = () => {
             <Button variant="outline" size="sm" className="tech-hover" onClick={() => window.location.href = '/contact'}>
               Contact Us
             </Button>
+            <Link to="/admin/login">
+              <Button variant="ghost" size="sm" className="tech-hover text-muted-foreground hover:text-secondary">
+                <Shield size={16} className="mr-1" />
+                Admin
+              </Button>
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -127,6 +133,16 @@ const Navigation = () => {
                 >
                   Contact Us
                 </Button>
+                <Link 
+                  to="/admin/login"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full"
+                >
+                  <Button variant="ghost" className="w-full tech-hover text-muted-foreground hover:text-secondary">
+                    <Shield size={16} className="mr-2" />
+                    Admin
+                  </Button>
+                </Link>
               </div>
             </div>
           </motion.div>
