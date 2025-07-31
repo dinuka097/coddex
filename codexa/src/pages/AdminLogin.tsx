@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
 const AdminLogin = () => {
@@ -18,10 +17,10 @@ const AdminLogin = () => {
     password: ''
   });
 
-  // Hardcoded admin credentials
+  // Updated admin credentials
   const ADMIN_CREDENTIALS = {
-    username: 'admin',
-    password: 'coddex2024'
+    username: 'coddex_admin',
+    password: 'CodexAdmin@2024!'
   };
 
   useEffect(() => {
@@ -112,7 +111,7 @@ const AdminLogin = () => {
                   <User className="absolute left-3 top-3 text-muted-foreground" size={18} />
                   <Input 
                     type="text" 
-                    placeholder="admin"
+                    placeholder="Enter username"
                     className="pl-10 bg-background/50 border-border focus:border-secondary"
                     value={formData.username}
                     onChange={(e) => setFormData({...formData, username: e.target.value})}
@@ -158,9 +157,6 @@ const AdminLogin = () => {
             <div className="text-center space-y-3">
               <p className="text-sm text-muted-foreground">
                 Authorized personnel only
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Username: admin | Password: coddex2024
               </p>
             </div>
           </CardContent>
