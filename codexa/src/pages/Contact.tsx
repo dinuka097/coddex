@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { addContactSubmission } from "@/lib/firebaseService";
 
 const Contact = () => {
   const { toast } = useToast();
@@ -27,22 +27,17 @@ const Contact = () => {
     e.preventDefault();
     
     try {
-      // Save to database
-      const { error } = await supabase
-        .from('contact_submissions')
-        .insert([
-          {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            email: formData.email,
-            phone_number: formData.phone || null,
-            service_interested: formData.service,
-            project_budget: formData.budget || null,
-            project_details: formData.message,
-          }
-        ]);
-
-      if (error) throw error;
+      // Save to Firebase database
+      await addContactSubmission({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone_number: formData.phone || undefined,
+        service_interested: formData.service,
+        project_budget: formData.budget || undefined,
+        project_details: formData.message,
+        notes: undefined
+      });
 
       toast({
         title: "Message Sent!",

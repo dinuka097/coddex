@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { addTestimonial } from "@/lib/firebaseService";
 
 const TestimonialForm = () => {
   const { toast } = useToast();
@@ -36,24 +36,18 @@ const TestimonialForm = () => {
     setIsLoading(true);
     
     try {
-      const { error } = await supabase
-        .from('testimonials')
-        .insert([
-          {
-            name: formData.name,
-            email: formData.email,
-            company: formData.company || null,
-            position: formData.position || null,
-            rating: rating,
-            review: formData.review,
-          }
-        ]);
-
-      if (error) throw error;
+      await addTestimonial({
+        name: formData.name,
+        email: formData.email,
+        company: formData.company || undefined,
+        position: formData.position || undefined,
+        rating: rating,
+        review: formData.review,
+      });
 
       toast({
-        title: "Thank You!",
-        description: "Your testimonial has been submitted successfully. It will be reviewed before being published.",
+        title: "Review Submitted!",
+        description: "Thank you for your testimonial. It will be reviewed and published soon.",
       });
       
       // Reset form

@@ -3,20 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Star, Quote, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
-
-interface Testimonial {
-  id: string;
-  name: string;
-  email: string;
-  company?: string;
-  position?: string;
-  rating: number;
-  review: string;
-  created_at: string;
-  is_approved: boolean;
-  is_featured: boolean;
-}
+import { getTestimonials, type Testimonial } from "@/lib/firebaseService";
 
 const TestimonialsSection = () => {
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
@@ -24,42 +11,54 @@ const TestimonialsSection = () => {
   const [loading, setLoading] = useState(true);
 
   // Fallback testimonials in case database is empty
-  const fallbackTestimonials = [
+  const fallbackTestimonials: Testimonial[] = [
     {
       id: "1",
       name: "Sarah Johnson",
+      email: "sarah@example.com",
+      company: "TechCorp Inc.",
       position: "CTO",
-      company: "TechStart Inc.",
-      email: "sarah@techstart.com",
-      review: "Coddex Technologies transformed our digital infrastructure completely. Their cybersecurity solutions gave us the confidence to scale globally without compromising on security.",
       rating: 5,
-      created_at: new Date().toISOString(),
+      review: "Coddex transformed our digital infrastructure completely. Their cybersecurity solutions are top-notch and their team is incredibly professional. We've seen a 40% improvement in our system security metrics since working with them.",
+      created_at: new Date(),
       is_approved: true,
       is_featured: true
     },
     {
-      id: "2",
+      id: "2", 
       name: "Michael Chen",
-      position: "CEO",
-      company: "Global Dynamics",
-      email: "michael@globaldynamics.com",
-      review: "Working with Coddex was a game-changer. Their team delivered a world-class e-commerce platform that increased our conversion rates by 300%. Exceptional work!",
+      email: "michael@example.com",
+      company: "StartupXYZ",
+      position: "Founder",
       rating: 5,
-      created_at: new Date().toISOString(),
+      review: "The web development team at Coddex delivered beyond our expectations. Our new platform is not only beautiful but also incredibly fast and secure. The ROI has been phenomenal - 300% increase in conversions!",
+      created_at: new Date(),
       is_approved: true,
       is_featured: true
     },
     {
       id: "3",
       name: "Emily Rodriguez",
-      position: "IT Director",
-      company: "FinanceCore",
-      email: "emily@financecore.com",
-      review: "The penetration testing and vulnerability assessment helped us identify critical security gaps. Their detailed reports and remediation guidance were invaluable.",
+      email: "emily@example.com", 
+      company: "DesignStudio Pro",
+      position: "Creative Director",
       rating: 5,
-      created_at: new Date().toISOString(),
+      review: "Their UI/UX design work is simply outstanding. They took our complex requirements and created an intuitive, user-friendly interface that our customers love. The collaboration process was seamless throughout.",
+      created_at: new Date(),
       is_approved: true,
-      is_featured: false
+      is_featured: true
+    },
+    {
+      id: "4",
+      name: "David Thompson",
+      email: "david@example.com",
+      company: "FinanceFlow",
+      position: "CEO",
+      rating: 5,
+      review: "Coddex's consulting services helped us navigate our digital transformation journey. Their strategic insights and technical expertise saved us months of development time and significant costs.",
+      created_at: new Date(),
+      is_approved: true,
+      is_featured: true
     }
   ];
 
@@ -69,21 +68,28 @@ const TestimonialsSection = () => {
 
   const fetchTestimonials = async () => {
     try {
-      const { data, error } = await supabase
-        .from('testimonials')
-        .select('*')
-        .eq('is_approved', true)
-        .order('is_featured', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await getTestimonials();
+      
+      // Filter for approved testimonials and sort by featured status
+      const approvedTestimonials = data
+        .filter(testimonial => testimonial.is_approved)
+        .sort((a, b) => {
+          // Featured testimonials first
+          if (a.is_featured && !b.is_featured) return -1;
+          if (!a.is_featured && b.is_featured) return 1;
+          
+          // Then by creation date (newest first)
+          const aDate = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at);
+          const bDate = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at);
+          return bDate.getTime() - aDate.getTime();
+        });
       
       // Use database testimonials if available, otherwise use fallback
-      const testimonialsToUse = data && data.length > 0 ? data : fallbackTestimonials;
+      const testimonialsToUse = approvedTestimonials.length > 0 ? approvedTestimonials : fallbackTestimonials;
       setTestimonials(testimonialsToUse);
     } catch (error) {
       console.error('Error fetching testimonials:', error);
-      // Use fallback testimonials if database fetch fails
+      // Use fallback testimonials if there's an error
       setTestimonials(fallbackTestimonials);
     } finally {
       setLoading(false);
